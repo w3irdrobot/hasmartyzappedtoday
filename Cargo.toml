@@ -1,0 +1,14 @@
+[package]
+authors = ["w3irdrobot"]
+edition = "2021"
+name = "hasmartyzappedtoday"
+version = "0.1.0"
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+dioxus = { version = "0.5", features = ["web", "router"] }
+dioxus-logger = "0.4.1"
+log = "0.4.19"
+nostr-sdk = { version = "0.30.0", default_features = false }
+# TODO: Delete this after rustc upgraded.
+proc-macro2 = "=1.0.79"
