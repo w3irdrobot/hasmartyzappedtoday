@@ -67,7 +67,11 @@ fn Home() -> Element {
         let zap_filter = Filter::new()
             .kind(Kind::ZapReceipt)
             .since(Timestamp::now() - Duration::from_secs(60 * 60 * 24));
-        let zap_sub_id = client.subscribe(vec![zap_filter], None).await;
+        let zap_p_filter = Filter::new()
+            .kind(Kind::ZapReceipt)
+            .custom_tag(SingleLetterTag::uppercase(Alphabet::P), npub.to_hex())
+            .since(Timestamp::now() - Duration::from_secs(60 * 60 * 24));
+        let zap_sub_id = client.subscribe(vec![zap_filter, zap_p_filter], None).await;
         let profile_filter = Filter::new().kind(Kind::Metadata).author(npub);
         let profile_sub_id = client.subscribe(vec![profile_filter], None).await;
 
