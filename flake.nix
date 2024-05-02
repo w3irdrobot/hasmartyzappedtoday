@@ -37,6 +37,9 @@
               dioxus-cli
               cargo-expand
               nodejs_20
+              binaryen
+              wabt
+              just
             ];
 
             CC_wasm32_unknown_unknown = "${pkgs.llvmPackages_14.clang-unwrapped}/bin/clang-14";

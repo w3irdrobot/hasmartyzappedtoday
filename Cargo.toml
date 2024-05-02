@@ -4,6 +4,10 @@ edition = "2021"
 name = "hasmartyzappedtoday"
 version = "0.1.0"
 
+[profile.release]
+lto = true
+opt-level = 'z'
+
 [dependencies]
 console_error_panic_hook = "0.1.7"
 dioxus = { version = "0.5", features = ["web", "router"] }
