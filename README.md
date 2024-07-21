@@ -30,4 +30,4 @@ Want to tell me how you feel? Hit me up [on Nostr](https://njump.me/rob@w3ird.te
 
 ## License
 
-Distributed under the AGPLv3 License. See LICENSE.txt for more information.
+Distributed under the AGPLv3 License. See [LICENSE.txt](./LICENSE.txt) for more information.
