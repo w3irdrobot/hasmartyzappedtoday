@@ -26,7 +26,6 @@
           complete.rustc
           complete.cargo
           complete.rust-src
-          targets.wasm32-unknown-unknown.latest.rust-std
         ];
         craneLib = crane.lib.${system}.overrideToolchain rust;
       in
@@ -34,16 +33,9 @@
         devShells.default = craneLib.devShell
           {
             packages = with pkgs; [
-              dioxus-cli
               cargo-expand
-              nodejs_20
-              binaryen
-              wabt
-              just
             ];
 
-            CC_wasm32_unknown_unknown = "${pkgs.llvmPackages_14.clang-unwrapped}/bin/clang-14";
-            CFLAGS_wasm32_unknown_unknown = "-I ${pkgs.llvmPackages_14.libclang.lib}/lib/clang/14.0.6/include/";
             RUST_SRC_PATH = "${rustPlatform.complete.rust-src}/lib/rustlib/src/rust/library";
           };
       });

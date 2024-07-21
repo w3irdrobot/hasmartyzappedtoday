@@ -1,17 +1,19 @@
-# Development
+# Has Marty Zapped Today?
 
-1. Install npm: https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
-2. Install the tailwind css cli: https://tailwindcss.com/docs/installation
-3. Run the following command in the root of the project to start the tailwind CSS compiler:
+Simple site for determining if [Marty Bent](https://njump.me/npub1guh5grefa7vkay4ps6udxg8lrqxg2kgr3qh9n4gduxut64nfxq0q9y6hjy) has zapped yet today.
 
-```bash
-npx tailwindcss -i ./input.css -o ./assets/main.css --watch
+## Development
+
+Ensure Rust and Cargo are installed. The easiey way to do that is using [rustup](https://rustup.rs/). Then run the development server and open up `localhost:8000`.
+
+```shell
+cargo run
 ```
 
-Run the following command in the root of the project to start the Dioxus dev server:
+## Building and Deployment
 
-```bash
-dx serve --hot-reload
+To build the application, use `cargo` like normal. When deploying, the expectation is the `assets` directory is also available. This can be made simpler by running the available build script.
+
+```shell
+./bin/build.sh
 ```
-
-- Open the browser to http://localhost:8080

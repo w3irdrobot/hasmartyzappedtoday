@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# shameless theft from https://github.com/cbiffle/bare-metal-wasm-example/blob/master/build.sh
 
-set -euxo pipefail
+rm -rf build
+mkdir build
+cargo build --release
+cp target/release/hasmartyzappedtoday build/
+cp -r assets build/
 
-BINARY=dist/assets/dioxus/hasmartyzappedtoday_bg.wasm
-
-dx build --release
-wasm-strip ${BINARY}
-wasm-opt -o ${BINARY} -Oz ${BINARY}
-ls -lh ${BINARY}
+echo 'built assets are available in the "build" directory'

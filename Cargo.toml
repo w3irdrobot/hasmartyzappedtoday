@@ -1,18 +1,17 @@
 [package]
-authors = ["w3irdrobot"]
 edition = "2021"
 name = "hasmartyzappedtoday"
 version = "0.1.0"
 
-[profile.release]
-lto = true
-opt-level = 'z'
-
 [dependencies]
-console_error_panic_hook = "0.1.7"
-dioxus = { version = "0.5", features = ["web", "router"] }
-dioxus-logger = "0.4.1"
-log = "0.4.19"
-nostr-sdk = { version = "0.30.0", default_features = false }
-# TODO: Delete this after rustc upgraded.
-proc-macro2 = "=1.0.79"
+anyhow = "1.0.86"
+axum = "0.7.5"
+config = "0.14.0"
+dotenvy = "0.15.7"
+env_logger = "0.11.3"
+log = "0.4.22"
+maud = { version = "0.26.0", features = ["axum"] }
+nostr-sdk = { version = "0.33.0", features = ["ndb"] }
+serde = "1.0.204"
+tokio = { version = "1.38.1", features = ["macros", "rt-multi-thread", "time"] }
+tower-http = { version = "0.5.2", features = ["cors", "fs", "normalize-path"] }
