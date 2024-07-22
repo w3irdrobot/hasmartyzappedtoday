@@ -65,28 +65,43 @@ async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Ma
     let has_zapped = check_for_zap_event(results);
 
     Ok(html! {
-        (header())
-        main.grid.min-h-full.place-items-center.bg-white."px-6"."py-24"."sm:py-32"."lg:px-8" {
-            h1."mb-3"."text-3xl".font-bold.tracking-tight."text-gray-900"."sm:text-5xl" {"Marty Bent"}
-            @if has_zapped {
-                p.text-base.font-semibold.text-indigo-600 {"has zapped today!"}
-            } @else {
-                p.text-base.font-semibold.text-indigo-600 {"has not zapped today!"}
+        (header(has_zapped))
+        body {
+            main.grid.min-h-full.place-items-center.bg-white."px-6"."py-24"."sm:py-32"."lg:px-8" {
+                h1."mb-3"."text-3xl".font-bold.tracking-tight."text-gray-900"."sm:text-5xl" {"Marty Bent"}
+                @if has_zapped {
+                    p.text-base.font-semibold.text-indigo-600 {"has zapped today!"}
+                } @else {
+                    p.text-base.font-semibold.text-indigo-600 {"has not zapped today!"}
+                }
             }
+            (footer())
         }
-        (footer())
     })
 }
 
-fn header() -> Markup {
+fn header(has_zapped: bool) -> Markup {
     html! {
         (DOCTYPE)
-        meta charset="UTF-8";
-        meta content="text/html;charset=utf-8" http-equiv="Content-Type";
-        meta name="viewport" content="width=device-width, initial-scale=1";
-        title { "Has Marty Zapped Today?" }
-        link rel="stylesheet" href="https://rsms.me/inter/inter.css";
-        link rel="stylesheet" href="/assets/main.css";
+        head {
+            meta charset="UTF-8";
+            meta content="text/html;charset=utf-8" http-equiv="Content-Type";
+            meta name="viewport" content="width=device-width, initial-scale=1";
+
+            meta property="og:title" content="Has Marty Zapped Today?";
+            meta property="og:type" content="website";
+            meta property="og:description" content="Check to make sure Marty Bent has zapped today.";
+            meta property="og:url" content="https://hasmartyzapped.today";
+            @if has_zapped {
+                meta property="og:image" content="/assets/yes.jpeg";
+            } @else {
+                meta property="og:image" content="/assets/no.jpeg";
+            }
+
+            title { "Has Marty Zapped Today?" }
+            link rel="stylesheet" href="https://rsms.me/inter/inter.css";
+            link rel="stylesheet" href="/assets/main.css";
+        }
     }
 }
 
