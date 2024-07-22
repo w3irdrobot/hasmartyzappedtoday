@@ -42,6 +42,8 @@ async fn get_config() -> Result<Config> {
                 .separator("__"),
         )
         .set_default("database_path", "./marty.db")?
+        .set_default("server.host", "0.0.0.0")?
+        .set_default("server.port", "8000")?
         .build()?;
 
     Ok(cfg.try_deserialize()?)
