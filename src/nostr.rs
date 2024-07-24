@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use ::time::OffsetDateTime;
 use anyhow::Result;
-use log::{debug, error, info};
+use log::{debug, error};
 use nostr_sdk::prelude::*;
 use sqlx::SqlitePool;
 
@@ -115,7 +115,7 @@ fn was_zapped_by_npub(event: &Event, npub: PublicKey) -> bool {
             if event.author() != npub {
                 return false;
             }
-            info!("the zapped event id: {}", event.id);
+            debug!("the zapped event id: {}", event.id);
             true
         }
         _ => false,
