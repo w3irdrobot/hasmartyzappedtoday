@@ -1,10 +1,14 @@
 use std::time::Duration;
 
+use ::time::OffsetDateTime;
 use anyhow::Result;
-use log::{debug, info};
+use log::{debug, error, info};
 use nostr_sdk::prelude::*;
+use sqlx::SqlitePool;
 
-const RELAYS: [&'static str; 9] = [
+use crate::db::{add_zap, zap_already_tracked};
+
+const RELAYS: [&str; 9] = [
     "wss://relay.damus.io",
     "wss://nostr.plebchain.org/",
     "wss://bitcoiner.social/",
@@ -47,47 +51,111 @@ pub async fn subscribe_to_npubs(client: Client) -> Result<()> {
     Ok(())
 }
 
+pub async fn save_zaps_to_db(client: Client, db: SqlitePool) -> Result<()> {
+    let marty_pubkey = PublicKey::parse(NPUB_MARTY).unwrap();
+    let mut notifications = client.notifications();
+
+    while let Ok(notification) = notifications.recv().await {
+        let RelayPoolNotification::Message { message, .. } = notification else {
+            continue;
+        };
+
+        let RelayMessage::Event { event, .. } = message else {
+            continue;
+        };
+
+        if !was_zapped_by_npub(&event, marty_pubkey) {
+            continue;
+        }
+
+        let npub = marty_pubkey.to_bech32().unwrap();
+        let receipt_id = event.id().to_hex();
+        match zap_already_tracked(db.clone(), &npub, &receipt_id).await {
+            Ok(true) => continue,
+            Ok(false) => {}
+            Err(err) => {
+                error!(
+                    "error checking if the zap '{}' is already tracked: '{}'. skipping.",
+                    event.id().to_hex(),
+                    err
+                );
+                continue;
+            }
+        }
+
+        let amount = get_zap_request_amount(&event);
+        let created_at = OffsetDateTime::from_unix_timestamp(event.created_at().as_u64() as i64)
+            .unwrap_or_else(|_| OffsetDateTime::now_utc());
+
+        match add_zap(db.clone(), &npub, &receipt_id, created_at, amount).await {
+            Ok(_) => debug!("zap '{}' saved", receipt_id),
+            Err(err) => error!("error saving zap '{}': {}", receipt_id, err),
+        }
+    }
+
+    Ok(())
+}
+
 pub fn zaps_filters_since(since: Timestamp) -> Vec<Filter> {
     let zap_filter = Filter::new().kind(Kind::ZapReceipt).since(since);
     let zap_p_filter = Filter::new()
         .kind(Kind::ZapReceipt)
-        .custom_tag(SingleLetterTag::uppercase(Alphabet::P), &npubs_to_check())
+        .custom_tag(SingleLetterTag::uppercase(Alphabet::P), npubs_to_check())
         .since(since);
 
     vec![zap_filter, zap_p_filter]
 }
 
-pub fn check_for_zap_event(events: Vec<Event>) -> bool {
-    let marty_pubkey = PublicKey::parse(NPUB_MARTY).unwrap();
-    for event in events {
-        match event.kind() {
-            Kind::ZapReceipt => {
-                let Some(tag) = event
-                    .tags()
-                    .iter()
-                    .find(|t| t.kind() == TagKind::Description)
-                else {
-                    debug!("no description tag found in event {}", event.id());
-                    continue;
-                };
-
-                let Ok(event) = Event::from_json(tag.content().unwrap()) else {
-                    debug!("description tag is not a valid event");
-                    continue;
-                };
-                if let Err(e) = event.verify() {
-                    debug!("invalid zap request event: {:?}", e);
-                    continue;
-                }
-                if event.author() != marty_pubkey {
-                    continue;
-                }
-                info!("the zapped event id: {}", event.id);
-                return true;
+fn was_zapped_by_npub(event: &Event, npub: PublicKey) -> bool {
+    match event.kind() {
+        Kind::ZapReceipt => {
+            let Some(event) = get_zap_request(event) else {
+                return false;
+            };
+            if event.author() != npub {
+                return false;
             }
-            _ => {}
+            info!("the zapped event id: {}", event.id);
+            true
         }
+        _ => false,
+    }
+}
+
+fn get_zap_request(event: &Event) -> Option<Event> {
+    let Some(tag) = event
+        .tags()
+        .iter()
+        .find(|t| t.kind() == TagKind::Description)
+    else {
+        debug!("no description tag found in event {}", event.id());
+        return None;
+    };
+
+    let Ok(event) = Event::from_json(tag.content().unwrap()) else {
+        debug!("description tag is not a valid event");
+        return None;
+    };
+    if let Err(e) = event.verify() {
+        debug!("invalid zap request event: {:?}", e);
+        return None;
     }
 
-    false
+    Some(event)
+}
+
+fn get_zap_request_amount(event: &Event) -> u32 {
+    let Some(event) = get_zap_request(event) else {
+        return 0;
+    };
+
+    let Some(tag) = event.tags().iter().find(|t| t.kind() == TagKind::Amount) else {
+        debug!("no amount tag found in event {}", event.id());
+        return 0;
+    };
+
+    tag.content()
+        .unwrap_or_default()
+        .parse()
+        .unwrap_or_default()
 }

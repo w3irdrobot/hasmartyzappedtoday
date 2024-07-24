@@ -1,10 +1,13 @@
 use anyhow::{bail, Result};
 use config::{Case, Environment};
+use log::debug;
 use serde::Deserialize;
 
+use crate::db::connect_database;
+use crate::nostr::{get_client, save_zaps_to_db, subscribe_to_npubs};
 use crate::server::{start_server, ServerConfig};
-use nostr::{get_client, subscribe_to_npubs};
 
+mod db;
 mod nostr;
 mod server;
 
@@ -18,17 +21,23 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     let cfg = get_config().await?;
-    let client = get_client(&cfg.database_path).await?;
+    debug!("config: {:?}", cfg);
+    let client = get_client(&cfg.ndb_path).await?;
+    let db = connect_database(&cfg.sqlite_path).await?;
 
+    let processor_handle = tokio::spawn(save_zaps_to_db(client.clone(), db.clone()));
     subscribe_to_npubs(client.clone()).await?;
-    start_server(cfg.server, client.clone()).await?;
+    let server_handle = tokio::spawn(start_server(cfg.server, db));
+
+    let _ = tokio::join!(processor_handle, server_handle);
 
     Ok(())
 }
 
 #[derive(Clone, Debug, Deserialize)]
 struct Config {
-    database_path: String,
+    ndb_path: String,
+    sqlite_path: String,
     server: ServerConfig,
 }
 
@@ -41,7 +50,8 @@ async fn get_config() -> Result<Config> {
                 .convert_case(Case::UpperSnake)
                 .separator("__"),
         )
-        .set_default("database_path", "./marty.db")?
+        .set_default("ndb_path", "./marty.db")?
+        .set_default("sqlite_path", "sqlite://zaps.db")?
         .set_default("server.host", "0.0.0.0")?
         .set_default("server.port", "8000")?
         .build()?;

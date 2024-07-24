@@ -3,8 +3,8 @@
         {
             "previewLimit": 50,
             "driver": "SQLite",
-            "name": "local",
-            "database": "${workspaceFolder:hasmartyzappedtoday}/martyzaps.db"
+            "name": "local zaps",
+            "database": "${workspaceFolder:hasmartyzappedtoday}/zaps.db"
         }
     ]
 }

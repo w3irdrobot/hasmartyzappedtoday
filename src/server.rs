@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 // use anyhow::Result;
+use ::time::OffsetDateTime;
 use axum::{
     extract::State,
     http::{HeaderValue, Method, StatusCode},
@@ -8,13 +9,14 @@ use axum::{
     routing::get,
     Router,
 };
-use log::info;
+use log::{error, info};
 use maud::{html, Markup, DOCTYPE};
-use nostr_sdk::prelude::*;
 use serde::Deserialize;
+use sqlx::SqlitePool;
 use tower_http::{cors::CorsLayer, normalize_path::NormalizePathLayer, services::ServeDir};
 
-use crate::nostr::{check_for_zap_event, zaps_filters_since};
+use crate::db::get_most_recent_zap;
+use crate::nostr::NPUB_MARTY;
 
 const TWENTY_FOUR_HOURS: Duration = Duration::from_secs(60 * 60 * 24);
 
@@ -27,11 +29,11 @@ pub struct ServerConfig {
 
 #[derive(Debug, Clone)]
 struct ServerContext {
-    client: Client,
+    db: SqlitePool,
 }
 
-pub async fn start_server(config: ServerConfig, client: Client) -> anyhow::Result<()> {
-    let state = Arc::new(ServerContext { client });
+pub async fn start_server(config: ServerConfig, db: SqlitePool) -> anyhow::Result<()> {
+    let state = Arc::new(ServerContext { db });
 
     let mut app = Router::new()
         .route("/", get(check_martys_zaps))
@@ -54,15 +56,15 @@ pub async fn start_server(config: ServerConfig, client: Client) -> anyhow::Resul
     Ok(axum::serve(listener, app).await?)
 }
 
-async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Markup> {
-    let client = state.client.clone();
-    let database = client.database();
-    let filters = zaps_filters_since(Timestamp::now() - TWENTY_FOUR_HOURS);
-    let results = database
-        .query(filters, Order::Desc)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let has_zapped = check_for_zap_event(results);
+async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Markup, StatusCode> {
+    let db = state.db.clone();
+    let has_zapped = match get_most_recent_zap(db, NPUB_MARTY).await {
+        Ok(zap) => zap.zapped_at >= OffsetDateTime::now_utc() - TWENTY_FOUR_HOURS,
+        Err(err) => {
+            error!("error getting most recent zap: {}", err);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     Ok(html! {
         (header(has_zapped))

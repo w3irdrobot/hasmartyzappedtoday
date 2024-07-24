@@ -13,5 +13,7 @@ log = "0.4.22"
 maud = { version = "0.26.0", features = ["axum"] }
 nostr-sdk = { version = "0.33.0", features = ["ndb"] }
 serde = "1.0.204"
+sqlx = { version = "0.8.0", features = ["sqlite", "runtime-tokio", "time"] }
+time = "0.3.36"
 tokio = { version = "1.38.1", features = ["macros", "rt-multi-thread", "time"] }
 tower-http = { version = "0.5.2", features = ["cors", "fs", "normalize-path"] }
