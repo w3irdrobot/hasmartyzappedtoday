@@ -1,11 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
+use rss::{ChannelBuilder, GuidBuilder, ItemBuilder};
+use time::format_description::well_known::Rfc3339;
 // use anyhow::Result;
 use ::time::OffsetDateTime;
 use axum::{
     extract::State,
-    http::{HeaderValue, Method, StatusCode},
-    response::Result,
+    http::{HeaderMap, HeaderValue, Method, StatusCode},
+    response::{IntoResponse, Result},
     routing::get,
     Router,
 };
@@ -15,7 +17,7 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 use tower_http::{cors::CorsLayer, normalize_path::NormalizePathLayer, services::ServeDir};
 
-use crate::db::get_most_recent_zap;
+use crate::db::{get_most_recent_zap, get_most_recent_zaps};
 use crate::nostr::NPUB_MARTY;
 
 const TWENTY_FOUR_HOURS: Duration = Duration::from_secs(60 * 60 * 24);
@@ -37,6 +39,7 @@ pub async fn start_server(config: ServerConfig, db: SqlitePool) -> anyhow::Resul
 
     let mut app = Router::new()
         .route("/", get(check_martys_zaps))
+        .route("/rss.xml", get(martys_zaps_rss))
         .nest_service("/assets", ServeDir::new("assets"))
         .with_state(state)
         .layer(NormalizePathLayer::trim_trailing_slash());
@@ -82,6 +85,53 @@ async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Ma
     })
 }
 
+async fn martys_zaps_rss(State(state): State<Arc<ServerContext>>) -> Result<impl IntoResponse> {
+    let db = state.db.clone();
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Content-Type",
+        HeaderValue::from_str("application/xml").unwrap(),
+    );
+
+    let mut channel = ChannelBuilder::default();
+    channel
+        .title("Has Marty Zapped Today?".to_string())
+        .link("https://hasmartyzapped.today")
+        .description("Determine if Marty Bent has zapped today.");
+
+    let zaps = get_most_recent_zaps(db, NPUB_MARTY, 20)
+        .await
+        .map_err(|e| {
+            error!("error getting the most recent 20 zaps: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    for zap in zaps {
+        let guid = GuidBuilder::default()
+            .value(zap.id.simple().to_string())
+            .build();
+        let amount_sats = zap.amount / 1000;
+        channel.item(
+            ItemBuilder::default()
+                .guid(guid)
+                .title(format!("Marty Bent zapped {} sats!", amount_sats))
+                .pub_date(zap.zapped_at.format(&Rfc3339).unwrap())
+                .content(format!(r#"
+            Marty Bent has zapped {} sats!
+            It was in <a href="https://njump.me/{}">event {}</a>.
+
+            Go <a href="https://njump.me/npub1guh5grefa7vkay4ps6udxg8lrqxg2kgr3qh9n4gduxut64nfxq0q9y6hjy">let him know</a> you're proud of him!
+        "#, amount_sats, zap.receipt_id, zap.receipt_id))
+                .build(),
+        );
+    }
+
+    let channel = channel.build();
+
+    Ok((headers, channel.to_string()))
+}
+
 fn header(has_zapped: bool) -> Markup {
     html! {
         (DOCTYPE)
@@ -103,12 +153,20 @@ fn header(has_zapped: bool) -> Markup {
             title { "Has Marty Zapped Today?" }
             link rel="stylesheet" href="https://rsms.me/inter/inter.css";
             link rel="stylesheet" href="/assets/main.css";
+            link rel="stylesheet" href="/assets/beinglazy.css";
         }
     }
 }
 
 fn footer() -> Markup {
     html! {
-        footer {}
+        footer.grid.min-h-full.place-items-center.bg-white."px-6"."py-24"."sm:py-32"."lg:px-8" {
+            h2 {
+                "Wanna know when Marty zaps in your feed reader?"
+            }
+            h3 {
+                a href="/rss.xml" { "Subscribe to our RSS feed!" }
+            }
+        }
     }
 }

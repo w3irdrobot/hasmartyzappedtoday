@@ -1,6 +1,7 @@
 use anyhow::Result;
 use sqlx::{migrate::Migrator, SqlitePool};
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
 
@@ -12,27 +13,40 @@ pub async fn connect_database(path: &str) -> Result<SqlitePool> {
     Ok(pool)
 }
 
+#[derive(Clone, Debug)]
 pub struct Zap {
+    pub id: Uuid,
+    pub receipt_id: String,
+    pub amount: u32,
     pub zapped_at: OffsetDateTime,
 }
 
 pub async fn get_most_recent_zap(db: SqlitePool, npub: &str) -> Result<Zap> {
+    Ok(get_most_recent_zaps(db, npub, 1).await?[0].clone())
+}
+
+pub async fn get_most_recent_zaps(db: SqlitePool, npub: &str, n: u32) -> Result<Vec<Zap>> {
     Ok(sqlx::query_as!(
         Zap,
-        r#"SELECT zapped_at AS "zapped_at: OffsetDateTime"
+        r#"SELECT
+            id AS "id: Uuid",
+            receipt_id,
+            amount AS "amount: u32",
+            zapped_at AS "zapped_at: OffsetDateTime"
         FROM zaps
         WHERE npub = $1
         ORDER BY zapped_at DESC
-        LIMIT 1"#,
-        npub
+        LIMIT $2"#,
+        npub,
+        n
     )
-    .fetch_one(&db)
+    .fetch_all(&db)
     .await?)
 }
 
 pub async fn zap_already_tracked(db: SqlitePool, npub: &str, receipt_id: &str) -> Result<bool> {
     match sqlx::query!(
-        "SELECT id FROM zaps WHERE npub = $1 AND receipt_id = $2",
+        "SELECT zapped_at FROM zaps WHERE npub = $1 AND receipt_id = $2",
         npub,
         receipt_id
     )
@@ -52,9 +66,11 @@ pub async fn add_zap(
     zapped_at: OffsetDateTime,
     amount: u32,
 ) -> Result<()> {
+    let id = Uuid::new_v4();
     sqlx::query!(
-        "INSERT INTO zaps (npub, receipt_id, zapped_at, amount)
-        VALUES ($1, $2, $3, $4)",
+        "INSERT INTO zaps (id, npub, receipt_id, zapped_at, amount)
+        VALUES ($1, $2, $3, $4, $5)",
+        id,
         npub,
         receipt_id,
         zapped_at,
