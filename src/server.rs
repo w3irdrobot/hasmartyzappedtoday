@@ -62,7 +62,16 @@ pub async fn start_server(config: ServerConfig, db: SqlitePool) -> anyhow::Resul
 async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Markup, StatusCode> {
     let db = state.db.clone();
     let has_zapped = match get_most_recent_zap(db, NPUB_MARTY).await {
-        Ok(zap) => zap.zapped_at >= OffsetDateTime::now_utc() - TWENTY_FOUR_HOURS,
+        Ok(zap) => {
+            let beginning_of_day = OffsetDateTime::now_utc()
+                .replace_hour(0)
+                .unwrap()
+                .replace_minute(0)
+                .unwrap()
+                .replace_second(0)
+                .unwrap();
+            zap.zapped_at >= beginning_of_day - TWENTY_FOUR_HOURS
+        }
         Err(err) => {
             error!("error getting most recent zap: {}", err);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
