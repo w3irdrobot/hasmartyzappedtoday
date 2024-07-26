@@ -17,8 +17,11 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 use tower_http::{cors::CorsLayer, normalize_path::NormalizePathLayer, services::ServeDir};
 
-use crate::db::{get_most_recent_zap, get_most_recent_zaps};
 use crate::nostr::NPUB_MARTY;
+use crate::{
+    db::{get_most_recent_zap, get_most_recent_zaps},
+    nostr::NPUB_ODELL,
+};
 
 const TWENTY_FOUR_HOURS: Duration = Duration::from_secs(60 * 60 * 24);
 
@@ -39,6 +42,7 @@ pub async fn start_server(config: ServerConfig, db: SqlitePool) -> anyhow::Resul
 
     let mut app = Router::new()
         .route("/", get(check_martys_zaps))
+        .route("/odell", get(check_odells_zaps))
         .route("/rss.xml", get(martys_zaps_rss))
         .nest_service("/assets", ServeDir::new("assets"))
         .with_state(state)
@@ -60,8 +64,20 @@ pub async fn start_server(config: ServerConfig, db: SqlitePool) -> anyhow::Resul
 }
 
 async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Markup, StatusCode> {
+    check_zaps_handler(state, "Marty Bent", NPUB_MARTY).await
+}
+
+async fn check_odells_zaps(State(state): State<Arc<ServerContext>>) -> Result<Markup, StatusCode> {
+    check_zaps_handler(state, "ODELL", NPUB_ODELL).await
+}
+
+async fn check_zaps_handler(
+    state: Arc<ServerContext>,
+    name: &str,
+    npub: &str,
+) -> Result<Markup, StatusCode> {
     let db = state.db.clone();
-    let has_zapped = match get_most_recent_zap(db, NPUB_MARTY).await {
+    let has_zapped = match get_most_recent_zap(db, npub).await {
         Ok(zap) => {
             let beginning_of_day = OffsetDateTime::now_utc()
                 .replace_hour(0)
@@ -82,13 +98,20 @@ async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Ma
         (header(has_zapped))
         body {
             main.grid.min-h-full.place-items-center.bg-white."px-6"."py-24"."sm:py-32"."lg:px-8" {
-                h1."mb-3"."text-3xl".font-bold.tracking-tight."text-gray-900"."sm:text-5xl" {"Marty Bent"}
+                h1."mb-3"."text-3xl".font-bold.tracking-tight."text-gray-900"."sm:text-5xl" { (name) }
                 @if has_zapped {
                     p.text-base.font-semibold.text-indigo-600 {"has zapped today!"}
                     img src="/assets/trump.webp";
                 } @else {
                     p.text-base.font-semibold.text-indigo-600 {"has not zapped today!"}
                     img src="/assets/biden.webp";
+                }
+                p {
+                    @if name == "ODELL" {
+                        a href="/" { "But has Marty zapped today?" }
+                    } @else {
+                        a href="/odell" { "But has ODELL zapped today?" }
+                    }
                 }
             }
             (footer())

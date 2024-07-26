@@ -21,6 +21,7 @@ const RELAYS: [&str; 9] = [
 ];
 
 pub const NPUB_MARTY: &str = "npub1guh5grefa7vkay4ps6udxg8lrqxg2kgr3qh9n4gduxut64nfxq0q9y6hjy";
+pub const NPUB_ODELL: &str = "npub1qny3tkh0acurzla8x3zy4nhrjz5zd8l9sy9jys09umwng00manysew95gx";
 
 const THIRTY_DAYS: Duration = Duration::from_secs(60 * 60 * 24 * 30);
 
@@ -41,7 +42,8 @@ pub async fn get_client(db_path: &str) -> Result<Client> {
 
 fn npubs_to_check() -> Vec<String> {
     let marty_pubkey = PublicKey::parse(NPUB_MARTY).unwrap();
-    vec![marty_pubkey.to_hex()]
+    let odell_pubkey = PublicKey::parse(NPUB_ODELL).unwrap();
+    vec![marty_pubkey.to_hex(), odell_pubkey.to_hex()]
 }
 
 pub async fn subscribe_to_npubs(client: Client) -> Result<()> {
@@ -53,6 +55,7 @@ pub async fn subscribe_to_npubs(client: Client) -> Result<()> {
 
 pub async fn save_zaps_to_db(client: Client, db: SqlitePool) -> Result<()> {
     let marty_pubkey = PublicKey::parse(NPUB_MARTY).unwrap();
+    let odells_pubkey = PublicKey::parse(NPUB_ODELL).unwrap();
     let mut notifications = client.notifications();
 
     while let Ok(notification) = notifications.recv().await {
@@ -64,11 +67,12 @@ pub async fn save_zaps_to_db(client: Client, db: SqlitePool) -> Result<()> {
             continue;
         };
 
-        if !was_zapped_by_npub(&event, marty_pubkey) {
+        if !was_zapped_by_npub(&event, &vec![marty_pubkey, odells_pubkey]) {
             continue;
         }
 
-        let npub = marty_pubkey.to_bech32().unwrap();
+        let request = get_zap_request(&event).unwrap();
+        let npub = request.author().to_bech32().unwrap();
         let receipt_id = event.id().to_hex();
         match zap_already_tracked(db.clone(), &npub, &receipt_id).await {
             Ok(true) => continue,
@@ -106,17 +110,19 @@ pub fn zaps_filters_since(since: Timestamp) -> Vec<Filter> {
     vec![zap_filter, zap_p_filter]
 }
 
-fn was_zapped_by_npub(event: &Event, npub: PublicKey) -> bool {
+fn was_zapped_by_npub(event: &Event, npubs: &[PublicKey]) -> bool {
     match event.kind() {
         Kind::ZapReceipt => {
             let Some(event) = get_zap_request(event) else {
                 return false;
             };
-            if event.author() != npub {
-                return false;
+            for npub in npubs {
+                if event.author() == *npub {
+                    debug!("the zapped event id: {}", event.id);
+                    return true;
+                }
             }
-            debug!("the zapped event id: {}", event.id);
-            true
+            false
         }
         _ => false,
     }
