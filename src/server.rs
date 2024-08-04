@@ -97,20 +97,35 @@ async fn check_zaps_handler(
     Ok(html! {
         (header(has_zapped))
         body {
-            main.grid.min-h-full.place-items-center.bg-white."px-6"."py-24"."sm:py-32"."lg:px-8" {
-                h1."mb-3"."text-3xl".font-bold.tracking-tight."text-gray-900"."sm:text-5xl" { (name) }
-                @if has_zapped {
-                    p.text-base.font-semibold.text-indigo-600 {"has zapped today!"}
-                    img src="/assets/trump.webp";
-                } @else {
-                    p.text-base.font-semibold.text-indigo-600 {"has not zapped today!"}
-                    img src="/assets/biden.webp";
-                }
-                p {
-                    @if name == "ODELL" {
-                        a href="/" { "But has Marty zapped today?" }
-                    } @else {
-                        a href="/odell" { "But has ODELL zapped today?" }
+            main.container.is-max-tablet.my-4 {
+                .content.has-text-centered {
+                    .block {
+                        h1 { (name) }
+                        @if has_zapped {
+                            p {"has zapped today!"}
+                            img src="/assets/thumbsup.webp";
+                        } @else {
+                            p {"has not zapped today!"}
+                            img src="/assets/angrypanda.webp";
+                        }
+                    }
+                    .block {
+                        p {
+                            @if name == "ODELL" {
+                                a href="/" { strong { "But has Marty zapped today?" } }
+                            } @else {
+                                a href="/odell" { strong { "But has ODELL zapped today?" } }
+                            }
+                        }
+                    }
+                    .block {
+                        p {
+                            "Wanna know when Marty zaps in your feed reader?"
+                            br
+                            a href="/rss.xml" { strong { "Subscribe to our RSS feed!" } }
+                        }
+                        p {
+                        }
                     }
                 }
             }
@@ -185,21 +200,19 @@ fn header(has_zapped: bool) -> Markup {
             }
 
             title { "Has Marty Zapped Today?" }
-            link rel="stylesheet" href="https://rsms.me/inter/inter.css";
-            link rel="stylesheet" href="/assets/main.css";
-            link rel="stylesheet" href="/assets/beinglazy.css";
+            link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css";
         }
     }
 }
 
 fn footer() -> Markup {
     html! {
-        footer.grid.min-h-full.place-items-center.bg-white."px-6"."py-24"."sm:py-32"."lg:px-8" {
-            h2 {
-                "Wanna know when Marty zaps in your feed reader?"
-            }
-            h3 {
-                a href="/rss.xml" { "Subscribe to our RSS feed!" }
+        footer {
+            .has-text-centered {
+                p {
+                    "Built by "
+                    a href="https://njump.me/rob@w3ird.tech" target="_blank" { "w3irdrobot" }
+                }
             }
         }
     }
