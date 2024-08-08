@@ -121,7 +121,7 @@ async fn check_zaps_handler(
                     .block {
                         p {
                             "Wanna know when Marty zaps in your feed reader?"
-                            br
+                            br;
                             a href="/rss.xml" { strong { "Subscribe to our RSS feed!" } }
                         }
                         p {
