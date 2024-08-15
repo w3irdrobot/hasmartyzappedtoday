@@ -21,8 +21,14 @@ pub struct Zap {
     pub zapped_at: OffsetDateTime,
 }
 
-pub async fn get_most_recent_zap(db: SqlitePool, npub: &str) -> Result<Zap> {
-    Ok(get_most_recent_zaps(db, npub, 1).await?[0].clone())
+pub async fn get_most_recent_zap(db: SqlitePool, npub: &str) -> Result<Option<Zap>> {
+    let zaps = get_most_recent_zaps(db, npub, 1).await?;
+
+    if zaps.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(zaps[0].clone()))
+    }
 }
 
 pub async fn get_most_recent_zaps(db: SqlitePool, npub: &str, n: u32) -> Result<Vec<Zap>> {
