@@ -21,6 +21,7 @@ const RELAYS: [&str; 9] = [
 ];
 
 pub const NPUB_MARTY: &str = "npub1guh5grefa7vkay4ps6udxg8lrqxg2kgr3qh9n4gduxut64nfxq0q9y6hjy";
+pub const NPUB_TFTC: &str = "npub1sk7mtp67zy7uex2f3dr5vdjynzpwu9dpc7q4f2c8cpjmguee6eeq56jraw";
 pub const NPUB_ODELL: &str = "npub1qny3tkh0acurzla8x3zy4nhrjz5zd8l9sy9jys09umwng00manysew95gx";
 
 const THIRTY_DAYS: Duration = Duration::from_secs(60 * 60 * 24 * 30);
@@ -43,7 +44,12 @@ pub async fn get_client(db_path: &str) -> Result<Client> {
 fn npubs_to_check() -> Vec<String> {
     let marty_pubkey = PublicKey::parse(NPUB_MARTY).unwrap();
     let odell_pubkey = PublicKey::parse(NPUB_ODELL).unwrap();
-    vec![marty_pubkey.to_hex(), odell_pubkey.to_hex()]
+    let tftc_pubkey = PublicKey::parse(NPUB_TFTC).unwrap();
+    vec![
+        marty_pubkey.to_hex(),
+        odell_pubkey.to_hex(),
+        tftc_pubkey.to_hex(),
+    ]
 }
 
 pub async fn subscribe_to_npubs(client: Client) -> Result<()> {
@@ -56,6 +62,7 @@ pub async fn subscribe_to_npubs(client: Client) -> Result<()> {
 pub async fn save_zaps_to_db(client: Client, db: SqlitePool) -> Result<()> {
     let marty_pubkey = PublicKey::parse(NPUB_MARTY).unwrap();
     let odells_pubkey = PublicKey::parse(NPUB_ODELL).unwrap();
+    let tftc_pubkey = PublicKey::parse(NPUB_TFTC).unwrap();
     let mut notifications = client.notifications();
 
     while let Ok(notification) = notifications.recv().await {
@@ -67,7 +74,7 @@ pub async fn save_zaps_to_db(client: Client, db: SqlitePool) -> Result<()> {
             continue;
         };
 
-        if !was_zapped_by_npub(&event, &vec![marty_pubkey, odells_pubkey]) {
+        if !was_zapped_by_npub(&event, &[marty_pubkey, odells_pubkey, tftc_pubkey]) {
             continue;
         }
 

@@ -17,7 +17,7 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 use tower_http::{cors::CorsLayer, normalize_path::NormalizePathLayer, services::ServeDir};
 
-use crate::nostr::NPUB_MARTY;
+use crate::nostr::{NPUB_MARTY, NPUB_TFTC};
 use crate::{
     db::{get_most_recent_zap, get_most_recent_zaps},
     nostr::NPUB_ODELL,
@@ -40,6 +40,7 @@ pub async fn start_server(config: ServerConfig, db: SqlitePool) -> anyhow::Resul
 
     let mut app = Router::new()
         .route("/", get(check_martys_zaps))
+        .route("/tftc", get(check_tftcs_zaps))
         .route("/odell", get(check_odells_zaps))
         .route("/rss.xml", get(martys_zaps_rss))
         .nest_service("/assets", ServeDir::new("assets"))
@@ -65,6 +66,10 @@ async fn check_martys_zaps(State(state): State<Arc<ServerContext>>) -> Result<Ma
     check_zaps_handler(state, "Marty Bent", NPUB_MARTY).await
 }
 
+async fn check_tftcs_zaps(State(state): State<Arc<ServerContext>>) -> Result<Markup, StatusCode> {
+    check_zaps_handler(state, "TFTC", NPUB_TFTC).await
+}
+
 async fn check_odells_zaps(State(state): State<Arc<ServerContext>>) -> Result<Markup, StatusCode> {
     check_zaps_handler(state, "ODELL", NPUB_ODELL).await
 }
@@ -76,7 +81,7 @@ async fn check_zaps_handler(
 ) -> Result<Markup, StatusCode> {
     let db = state.db.clone();
     let has_zapped = match get_most_recent_zap(db, npub).await {
-        Ok(zap) => {
+        Ok(Some(zap)) => {
             let beginning_of_day = OffsetDateTime::now_utc()
                 .replace_hour(0)
                 .unwrap()
@@ -86,6 +91,7 @@ async fn check_zaps_handler(
                 .unwrap();
             zap.zapped_at >= beginning_of_day
         }
+        Ok(None) => false,
         Err(err) => {
             error!("error getting most recent zap: {}", err);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
@@ -109,10 +115,16 @@ async fn check_zaps_handler(
                     }
                     .block {
                         p {
-                            @if name == "ODELL" {
-                                a href="/" { strong { "But has Marty zapped today?" } }
-                            } @else {
-                                a href="/odell" { strong { "But has ODELL zapped today?" } }
+                            @if name != "ODELL" {
+                                a href="/odell" { strong { "Has ODELL zapped today?" } }
+                                br;
+                            }
+                            @if name != "Marty Bent" {
+                                a href="/" { strong { "Has Marty zapped today?" } }
+                                br;
+                            }
+                            @if name != "TFTC" {
+                                a href="/tftc" { strong { "Has TFTC zapped today?" } }
                             }
                         }
                     }
