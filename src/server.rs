@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use rss::{ChannelBuilder, GuidBuilder, ItemBuilder};
 use time::format_description::well_known::Rfc3339;
@@ -22,8 +22,6 @@ use crate::{
     db::{get_most_recent_zap, get_most_recent_zaps},
     nostr::NPUB_ODELL,
 };
-
-const TWENTY_FOUR_HOURS: Duration = Duration::from_secs(60 * 60 * 24);
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ServerConfig {
@@ -86,7 +84,7 @@ async fn check_zaps_handler(
                 .unwrap()
                 .replace_second(0)
                 .unwrap();
-            zap.zapped_at >= beginning_of_day - TWENTY_FOUR_HOURS
+            zap.zapped_at >= beginning_of_day
         }
         Err(err) => {
             error!("error getting most recent zap: {}", err);
