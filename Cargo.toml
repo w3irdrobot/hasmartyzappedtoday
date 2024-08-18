@@ -9,6 +9,7 @@ axum = "0.7.5"
 config = "0.14.0"
 dotenvy = "0.15.7"
 env_logger = "0.11.3"
+lightning-invoice = "0.31.0"
 log = "0.4.22"
 maud = { version = "0.26.0", features = ["axum"] }
 nostr-sdk = { version = "0.33.0", features = ["ndb"] }

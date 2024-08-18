@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use ::time::OffsetDateTime;
 use anyhow::Result;
+use lightning_invoice::{Bolt11Invoice, SignedRawBolt11Invoice};
 use log::{debug, error};
 use nostr_sdk::prelude::*;
 use sqlx::SqlitePool;
@@ -94,7 +95,9 @@ pub async fn save_zaps_to_db(client: Client, db: SqlitePool) -> Result<()> {
             }
         }
 
-        let amount = get_zap_request_amount(&event);
+        // casting down because sqlx can't insert u64 automatically into sqlite and i'm lazy.
+        // i can't imagine anyone is sending zaps that big anyways.
+        let amount = u32::try_from(get_zap_request_amount(&event)).unwrap_or(u32::MAX);
         let created_at = OffsetDateTime::from_unix_timestamp(event.created_at().as_u64() as i64)
             .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
@@ -157,18 +160,37 @@ fn get_zap_request(event: &Event) -> Option<Event> {
     Some(event)
 }
 
-fn get_zap_request_amount(event: &Event) -> u32 {
+pub fn get_zap_request_amount(event: &Event) -> u64 {
     let Some(event) = get_zap_request(event) else {
         return 0;
     };
 
-    let Some(tag) = event.tags().iter().find(|t| t.kind() == TagKind::Amount) else {
-        debug!("no amount tag found in event {}", event.id());
-        return 0;
-    };
+    match event.tags().iter().find(|t| t.kind() == TagKind::Amount) {
+        Some(tag) => tag
+            .content()
+            .unwrap_or_default()
+            .parse()
+            .unwrap_or_default(),
+        None => {
+            debug!(
+                "no amount tag found in event {}. will look for an ln invoice",
+                event.id()
+            );
+            let Some(tag) = event.tags().iter().find(|t| t.kind() == TagKind::Bolt11) else {
+                debug!("No bolt11 invoice found in event {}", event.id());
+                return 0;
+            };
+            let content = tag.content().unwrap();
+            let signed = content.parse::<SignedRawBolt11Invoice>().unwrap();
+            let Ok(invoice) = Bolt11Invoice::from_signed(signed) else {
+                error!(
+                    "Could not parse the bolt11 tag as a bolt11 invoice: {}",
+                    content
+                );
+                return 0;
+            };
 
-    tag.content()
-        .unwrap_or_default()
-        .parse()
-        .unwrap_or_default()
+            invoice.amount_milli_satoshis().unwrap_or_default()
+        }
+    }
 }
